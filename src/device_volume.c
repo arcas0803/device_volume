@@ -224,7 +224,7 @@ FFI_PLUGIN_EXPORT DeviceVolumeResult device_volume_decrement(int32_t channel,
 #elif defined(_WIN32)
 
 #define COBJMACROS
-#define INITGUID
+#include <initguid.h>
 #include <windows.h>
 #include <mmdeviceapi.h>
 #include <endpointvolume.h>

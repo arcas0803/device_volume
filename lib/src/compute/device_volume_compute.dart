@@ -2,19 +2,16 @@ import 'package:flutter/foundation.dart';
 
 import '../backends/backend_selector.dart';
 import '../models/volume_channel.dart';
-import '../models/volume_state.dart';
 
 /// Runs [DeviceVolumeBackend.getVolume] on a background isolate via
 /// [compute].
-Future<VolumeState> getVolumeCompute({
-  VolumeChannel channel = VolumeChannel.media,
-}) {
+Future<int> getVolumeCompute({VolumeChannel channel = VolumeChannel.media}) {
   return compute(_getVolume, channel);
 }
 
 /// Runs [DeviceVolumeBackend.setVolume] on a background isolate via
 /// [compute].
-Future<VolumeState> setVolumeCompute(
+Future<int> setVolumeCompute(
   int value, {
   VolumeChannel channel = VolumeChannel.media,
   bool showSystemUi = false,
@@ -27,7 +24,7 @@ Future<VolumeState> setVolumeCompute(
 
 /// Runs [DeviceVolumeBackend.incrementVolume] on a background isolate via
 /// [compute].
-Future<VolumeState> incrementVolumeCompute({
+Future<int> incrementVolumeCompute({
   VolumeChannel channel = VolumeChannel.media,
   bool showSystemUi = false,
 }) {
@@ -43,7 +40,7 @@ Future<VolumeState> incrementVolumeCompute({
 
 /// Runs [DeviceVolumeBackend.decrementVolume] on a background isolate via
 /// [compute].
-Future<VolumeState> decrementVolumeCompute({
+Future<int> decrementVolumeCompute({
   VolumeChannel channel = VolumeChannel.media,
   bool showSystemUi = false,
 }) {
@@ -59,11 +56,11 @@ Future<VolumeState> decrementVolumeCompute({
 
 // ── Top-level functions required by compute() ───────────────────────────────
 
-VolumeState _getVolume(VolumeChannel channel) {
+int _getVolume(VolumeChannel channel) {
   return backendForCurrentPlatform().getVolume(channel: channel);
 }
 
-VolumeState _setVolume(_SetVolumeArgs args) {
+int _setVolume(_SetVolumeArgs args) {
   return backendForCurrentPlatform().setVolume(
     args.value,
     channel: args.channel,
@@ -71,7 +68,7 @@ VolumeState _setVolume(_SetVolumeArgs args) {
   );
 }
 
-VolumeState _adjustVolume(_AdjustVolumeArgs args) {
+int _adjustVolume(_AdjustVolumeArgs args) {
   final backend = backendForCurrentPlatform();
   if (args.increment) {
     return backend.incrementVolume(

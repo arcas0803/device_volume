@@ -5,7 +5,6 @@ import 'dart:io';
 import '../../device_volume_bindings_generated.dart';
 import '../exceptions/device_volume_exception.dart';
 import '../models/volume_channel.dart';
-import '../models/volume_state.dart';
 import 'device_volume_backend.dart';
 
 /// FFI backend used on iOS, macOS, Linux, and Windows.
@@ -57,15 +56,9 @@ class FfiBackend implements DeviceVolumeBackend {
 
   // ── Result translation ───────────────────────────────────────────────────
 
-  VolumeState _toState(DeviceVolumeResult r, VolumeChannel channel) {
+  int _toInt(DeviceVolumeResult r) {
     _checkError(r);
-    return VolumeState.fromRaw(
-      value: r.value,
-      min: r.min,
-      max: r.max,
-      isMuted: r.is_muted != 0,
-      channel: channel,
-    );
+    return r.value;
   }
 
   void _checkError(DeviceVolumeResult r) {
@@ -102,13 +95,13 @@ class FfiBackend implements DeviceVolumeBackend {
   // ── Public API ───────────────────────────────────────────────────────────
 
   @override
-  VolumeState getVolume({VolumeChannel channel = VolumeChannel.media}) {
+  int getVolume({VolumeChannel channel = VolumeChannel.media}) {
     final r = _bindings.device_volume_get(_channelIndex(channel));
-    return _toState(r, channel);
+    return _toInt(r);
   }
 
   @override
-  VolumeState setVolume(
+  int setVolume(
     int value, {
     VolumeChannel channel = VolumeChannel.media,
     bool showSystemUi = false,
@@ -118,11 +111,11 @@ class FfiBackend implements DeviceVolumeBackend {
       value,
       showSystemUi ? 1 : 0,
     );
-    return _toState(r, channel);
+    return _toInt(r);
   }
 
   @override
-  VolumeState incrementVolume({
+  int incrementVolume({
     VolumeChannel channel = VolumeChannel.media,
     bool showSystemUi = false,
   }) {
@@ -130,11 +123,11 @@ class FfiBackend implements DeviceVolumeBackend {
       _channelIndex(channel),
       showSystemUi ? 1 : 0,
     );
-    return _toState(r, channel);
+    return _toInt(r);
   }
 
   @override
-  VolumeState decrementVolume({
+  int decrementVolume({
     VolumeChannel channel = VolumeChannel.media,
     bool showSystemUi = false,
   }) {
@@ -142,29 +135,25 @@ class FfiBackend implements DeviceVolumeBackend {
       _channelIndex(channel),
       showSystemUi ? 1 : 0,
     );
-    return _toState(r, channel);
+    return _toInt(r);
   }
 
   @override
-  Stream<VolumeState> streamVolume({
-    VolumeChannel channel = VolumeChannel.media,
-  }) {
-    late StreamController<VolumeState> controller;
+  Stream<int> streamVolume({VolumeChannel channel = VolumeChannel.media}) {
+    late StreamController<int> controller;
     Timer? timer;
-    VolumeState? lastState;
+    int? lastValue;
 
-    controller = StreamController<VolumeState>(
+    controller = StreamController<int>(
       onListen: () {
-        // Emit initial state
-        lastState = getVolume(channel: channel);
-        controller.add(lastState!);
+        lastValue = getVolume(channel: channel);
+        controller.add(lastValue!);
 
-        // Poll for changes every 250 ms
         timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
           try {
             final current = getVolume(channel: channel);
-            if (current != lastState) {
-              lastState = current;
+            if (current != lastValue) {
+              lastValue = current;
               controller.add(current);
             }
           } on DeviceVolumeException catch (e) {

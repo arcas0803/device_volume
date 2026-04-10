@@ -1,30 +1,34 @@
 /// Control the device volume from Flutter.
 ///
+/// All volume values are normalized to an **integer 0–100** scale regardless
+/// of the platform's native range.
+///
 /// ```dart
 /// import 'package:device_volume/device_volume.dart';
 ///
 /// // Read
-/// final state = DeviceVolume.getVolume();
-/// print('Volume: ${state.value}/${state.max}');
+/// final volume = DeviceVolume.getVolume();
+/// print('Volume: $volume%');
 ///
 /// // Write
-/// DeviceVolume.setVolume(10);
+/// DeviceVolume.setVolume(50);
 ///
 /// // Observe
-/// DeviceVolume.streamVolume().listen(print);
+/// DeviceVolume.streamVolume().listen((v) => print('$v%'));
 /// ```
 library;
 
 import 'src/backends/backend_selector.dart';
 import 'src/compute/device_volume_compute.dart' as vol_compute;
+import 'src/exceptions/device_volume_exception.dart';
 import 'src/models/volume_channel.dart';
-import 'src/models/volume_state.dart';
 
 export 'src/exceptions/device_volume_exception.dart';
 export 'src/models/volume_channel.dart';
-export 'src/models/volume_state.dart';
 
 /// Unified façade for controlling the device volume.
+///
+/// All volume values are normalized to an integer **0–100** scale.
 ///
 /// All synchronous methods execute on the calling isolate. For each one there
 /// is a `*Compute` counterpart that runs the operation on a background isolate
@@ -36,20 +40,28 @@ export 'src/models/volume_state.dart';
 abstract final class DeviceVolume {
   // ── Synchronous API ─────────────────────────────────────────────────────
 
-  /// Returns the current volume state for [channel].
-  static VolumeState getVolume({VolumeChannel channel = VolumeChannel.media}) {
+  /// Returns the current volume (0–100) for [channel].
+  static int getVolume({VolumeChannel channel = VolumeChannel.media}) {
     return backendForCurrentPlatform().getVolume(channel: channel);
   }
 
-  /// Sets the volume to [value] for [channel].
+  /// Sets the volume to [value] (0–100) for [channel] and returns the
+  /// resulting volume.
   ///
-  /// When [showSystemUi] is `true`, the platform's volume overlay is shown
-  /// (where supported).
-  static VolumeState setVolume(
+  /// Throws [InvalidVolumeValueException] if [value] is not in the 0–100
+  /// range. When [showSystemUi] is `true`, the platform's volume overlay is
+  /// shown (where supported).
+  static int setVolume(
     int value, {
     VolumeChannel channel = VolumeChannel.media,
     bool showSystemUi = false,
   }) {
+    if (value < 0 || value > 100) {
+      throw InvalidVolumeValueException(
+        message: 'Volume must be between 0 and 100, got $value.',
+        details: {'value': value},
+      );
+    }
     return backendForCurrentPlatform().setVolume(
       value,
       channel: channel,
@@ -58,7 +70,9 @@ abstract final class DeviceVolume {
   }
 
   /// Increases volume by one platform step for [channel].
-  static VolumeState incrementVolume({
+  ///
+  /// Returns the resulting volume (0–100).
+  static int incrementVolume({
     VolumeChannel channel = VolumeChannel.media,
     bool showSystemUi = false,
   }) {
@@ -69,7 +83,9 @@ abstract final class DeviceVolume {
   }
 
   /// Decreases volume by one platform step for [channel].
-  static VolumeState decrementVolume({
+  ///
+  /// Returns the resulting volume (0–100).
+  static int decrementVolume({
     VolumeChannel channel = VolumeChannel.media,
     bool showSystemUi = false,
   }) {
@@ -82,18 +98,27 @@ abstract final class DeviceVolume {
   // ── Compute variants ──────────────────────────────────────────────────
 
   /// Like [getVolume] but executed on a background isolate.
-  static Future<VolumeState> getVolumeCompute({
+  static Future<int> getVolumeCompute({
     VolumeChannel channel = VolumeChannel.media,
   }) {
     return vol_compute.getVolumeCompute(channel: channel);
   }
 
   /// Like [setVolume] but executed on a background isolate.
-  static Future<VolumeState> setVolumeCompute(
+  ///
+  /// Throws [InvalidVolumeValueException] if [value] is not in the 0–100
+  /// range.
+  static Future<int> setVolumeCompute(
     int value, {
     VolumeChannel channel = VolumeChannel.media,
     bool showSystemUi = false,
   }) {
+    if (value < 0 || value > 100) {
+      throw InvalidVolumeValueException(
+        message: 'Volume must be between 0 and 100, got $value.',
+        details: {'value': value},
+      );
+    }
     return vol_compute.setVolumeCompute(
       value,
       channel: channel,
@@ -102,7 +127,7 @@ abstract final class DeviceVolume {
   }
 
   /// Like [incrementVolume] but executed on a background isolate.
-  static Future<VolumeState> incrementVolumeCompute({
+  static Future<int> incrementVolumeCompute({
     VolumeChannel channel = VolumeChannel.media,
     bool showSystemUi = false,
   }) {
@@ -113,7 +138,7 @@ abstract final class DeviceVolume {
   }
 
   /// Like [decrementVolume] but executed on a background isolate.
-  static Future<VolumeState> decrementVolumeCompute({
+  static Future<int> decrementVolumeCompute({
     VolumeChannel channel = VolumeChannel.media,
     bool showSystemUi = false,
   }) {
@@ -125,12 +150,12 @@ abstract final class DeviceVolume {
 
   // ── Stream ────────────────────────────────────────────────────────────
 
-  /// Emits the current volume state immediately, then emits on every change.
+  /// Emits the current volume (0–100) immediately, then emits on every change.
   ///
   /// There is no `streamVolumeCompute` variant because `compute` cannot
   /// sustain a live stream. The stream is backed by a native observer or a
   /// dedicated isolate depending on the platform.
-  static Stream<VolumeState> streamVolume({
+  static Stream<int> streamVolume({
     VolumeChannel channel = VolumeChannel.media,
   }) {
     return backendForCurrentPlatform().streamVolume(channel: channel);

@@ -5,7 +5,6 @@ import 'package:jni/jni.dart';
 import '../exceptions/device_volume_exception.dart';
 import '../jni/device_volume_helper.dart';
 import '../models/volume_channel.dart';
-import '../models/volume_state.dart';
 import 'device_volume_backend.dart';
 
 /// Android backend using JNIgen-generated bindings to AudioManager.
@@ -47,20 +46,14 @@ class AndroidBackend implements DeviceVolumeBackend {
     }
   }
 
-  VolumeState _query(VolumeChannel channel) {
+  int _query(VolumeChannel channel) {
     final stream = _streamType(channel);
     try {
       final value = _helper.getStreamVolume(stream);
       final max = _helper.getStreamMaxVolume(stream);
       final min = _helper.getStreamMinVolume(stream);
-      final muted = _helper.isStreamMute(stream);
-      return VolumeState.fromRaw(
-        value: value,
-        min: min,
-        max: max,
-        isMuted: muted,
-        channel: channel,
-      );
+      final range = max - min;
+      return range > 0 ? ((value - min) / range * 100).round() : 0;
     } on Exception catch (e) {
       throw NativeBackendException(
         message: 'AudioManager error: $e',
@@ -72,12 +65,12 @@ class AndroidBackend implements DeviceVolumeBackend {
   // ── Public API ───────────────────────────────────────────────────────────
 
   @override
-  VolumeState getVolume({VolumeChannel channel = VolumeChannel.media}) {
+  int getVolume({VolumeChannel channel = VolumeChannel.media}) {
     return _query(channel);
   }
 
   @override
-  VolumeState setVolume(
+  int setVolume(
     int value, {
     VolumeChannel channel = VolumeChannel.media,
     bool showSystemUi = false,
@@ -85,19 +78,15 @@ class AndroidBackend implements DeviceVolumeBackend {
     final stream = _streamType(channel);
     final max = _helper.getStreamMaxVolume(stream);
     final min = _helper.getStreamMinVolume(stream);
-    if (value < min || value > max) {
-      throw InvalidVolumeValueException(
-        message: 'Value $value is out of range [$min, $max].',
-        details: {'value': value, 'min': min, 'max': max},
-      );
-    }
+    final range = max - min;
+    final nativeValue = range > 0 ? (value / 100 * range + min).round() : min;
     final flags = showSystemUi ? DeviceVolumeHelper.FLAG_SHOW_UI : 0;
-    _helper.setStreamVolume(stream, value, flags);
+    _helper.setStreamVolume(stream, nativeValue, flags);
     return _query(channel);
   }
 
   @override
-  VolumeState incrementVolume({
+  int incrementVolume({
     VolumeChannel channel = VolumeChannel.media,
     bool showSystemUi = false,
   }) {
@@ -108,7 +97,7 @@ class AndroidBackend implements DeviceVolumeBackend {
   }
 
   @override
-  VolumeState decrementVolume({
+  int decrementVolume({
     VolumeChannel channel = VolumeChannel.media,
     bool showSystemUi = false,
   }) {
@@ -119,23 +108,21 @@ class AndroidBackend implements DeviceVolumeBackend {
   }
 
   @override
-  Stream<VolumeState> streamVolume({
-    VolumeChannel channel = VolumeChannel.media,
-  }) {
-    late StreamController<VolumeState> controller;
+  Stream<int> streamVolume({VolumeChannel channel = VolumeChannel.media}) {
+    late StreamController<int> controller;
     Timer? timer;
-    VolumeState? lastState;
+    int? lastValue;
 
-    controller = StreamController<VolumeState>(
+    controller = StreamController<int>(
       onListen: () {
-        lastState = _query(channel);
-        controller.add(lastState!);
+        lastValue = _query(channel);
+        controller.add(lastValue!);
 
         timer = Timer.periodic(const Duration(milliseconds: 250), (_) {
           try {
             final current = _query(channel);
-            if (current != lastState) {
-              lastState = current;
+            if (current != lastValue) {
+              lastValue = current;
               controller.add(current);
             }
           } on DeviceVolumeException catch (e) {

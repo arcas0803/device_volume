@@ -73,8 +73,8 @@ class ChannelPage extends StatefulWidget {
 }
 
 class _ChannelPageState extends State<ChannelPage> {
-  VolumeState? _state;
-  StreamSubscription<VolumeState>? _sub;
+  int? _volume;
+  StreamSubscription<int>? _sub;
   String? _error;
   bool _useCompute = false;
   String? _computeLog;
@@ -95,9 +95,9 @@ class _ChannelPageState extends State<ChannelPage> {
 
   void _init() {
     try {
-      final s = DeviceVolume.getVolume(channel: widget.channel);
+      final v = DeviceVolume.getVolume(channel: widget.channel);
       setState(() {
-        _state = s;
+        _volume = v;
         _error = null;
       });
     } on DeviceVolumeException catch (e) {
@@ -106,7 +106,7 @@ class _ChannelPageState extends State<ChannelPage> {
 
     _sub?.cancel();
     _sub = DeviceVolume.streamVolume(channel: widget.channel).listen(
-      (s) => setState(() => _state = s),
+      (v) => setState(() => _volume = v),
       onError: (Object e) => setState(() => _error = e.toString()),
     );
   }
@@ -115,23 +115,23 @@ class _ChannelPageState extends State<ChannelPage> {
 
   Future<void> _setVolume(int value) async {
     try {
-      VolumeState s;
+      int v;
       if (_useCompute) {
-        s = await DeviceVolume.setVolumeCompute(
+        v = await DeviceVolume.setVolumeCompute(
           value,
           channel: widget.channel,
           showSystemUi: true,
         );
         _logCompute('setVolumeCompute($value)');
       } else {
-        s = DeviceVolume.setVolume(
+        v = DeviceVolume.setVolume(
           value,
           channel: widget.channel,
           showSystemUi: true,
         );
       }
       setState(() {
-        _state = s;
+        _volume = v;
         _error = null;
       });
     } on DeviceVolumeException catch (e) {
@@ -141,21 +141,21 @@ class _ChannelPageState extends State<ChannelPage> {
 
   Future<void> _increment() async {
     try {
-      VolumeState s;
+      int v;
       if (_useCompute) {
-        s = await DeviceVolume.incrementVolumeCompute(
+        v = await DeviceVolume.incrementVolumeCompute(
           channel: widget.channel,
           showSystemUi: true,
         );
         _logCompute('incrementVolumeCompute()');
       } else {
-        s = DeviceVolume.incrementVolume(
+        v = DeviceVolume.incrementVolume(
           channel: widget.channel,
           showSystemUi: true,
         );
       }
       setState(() {
-        _state = s;
+        _volume = v;
         _error = null;
       });
     } on DeviceVolumeException catch (e) {
@@ -165,21 +165,21 @@ class _ChannelPageState extends State<ChannelPage> {
 
   Future<void> _decrement() async {
     try {
-      VolumeState s;
+      int v;
       if (_useCompute) {
-        s = await DeviceVolume.decrementVolumeCompute(
+        v = await DeviceVolume.decrementVolumeCompute(
           channel: widget.channel,
           showSystemUi: true,
         );
         _logCompute('decrementVolumeCompute()');
       } else {
-        s = DeviceVolume.decrementVolume(
+        v = DeviceVolume.decrementVolume(
           channel: widget.channel,
           showSystemUi: true,
         );
       }
       setState(() {
-        _state = s;
+        _volume = v;
         _error = null;
       });
     } on DeviceVolumeException catch (e) {
@@ -188,15 +188,15 @@ class _ChannelPageState extends State<ChannelPage> {
   }
 
   Future<void> _mute() async {
-    await _setVolume(_state?.min ?? 0);
+    await _setVolume(0);
   }
 
   Future<void> _getVolumeCompute() async {
     try {
-      final s = await DeviceVolume.getVolumeCompute(channel: widget.channel);
-      _logCompute('getVolumeCompute() → ${s.value}');
+      final v = await DeviceVolume.getVolumeCompute(channel: widget.channel);
+      _logCompute('getVolumeCompute() → $v');
       setState(() {
-        _state = s;
+        _volume = v;
         _error = null;
       });
     } on DeviceVolumeException catch (e) {
@@ -232,53 +232,44 @@ class _ChannelPageState extends State<ChannelPage> {
           const SizedBox(height: 12),
         ],
 
-        if (_state case final vs?) ...[
+        if (_volume case final vol?) ...[
           // ── Volume info ──────────────────────────────────────────────
           _SectionCard(
             title: 'Volume info',
             children: [
-              _InfoRow('Channel', vs.channel.name),
-              _InfoRow('Value', '${vs.value}'),
-              _InfoRow('Range', '${vs.min} – ${vs.max}'),
-              _InfoRow(
-                'Normalized',
-                '${(vs.normalized * 100).toStringAsFixed(0)}%',
-              ),
-              _InfoRow('Muted', vs.isMuted ? 'Yes' : 'No'),
+              _InfoRow('Channel', widget.channel.name),
+              _InfoRow('Volume', '$vol%'),
             ],
           ),
           const SizedBox(height: 16),
 
-          // ── Slider (1 by 1) ──────────────────────────────────────────
+          // ── Slider (0–100) ───────────────────────────────────────────
           _SectionCard(
-            title: 'Set volume (1 by 1)',
+            title: 'Set volume',
             children: [
               Row(
                 children: [
-                  Text('${vs.min}'),
+                  const Text('0'),
                   Expanded(
                     child: Slider(
-                      min: vs.min.toDouble(),
-                      max: vs.max.toDouble(),
-                      divisions: vs.max - vs.min > 0 ? vs.max - vs.min : null,
-                      value: vs.value.toDouble().clamp(
-                        vs.min.toDouble(),
-                        vs.max.toDouble(),
-                      ),
-                      label: '${vs.value}',
+                      min: 0,
+                      max: 100,
+                      divisions: 100,
+                      value: vol.toDouble(),
+                      label: '$vol',
                       onChanged: (v) => _setVolume(v.round()),
                     ),
                   ),
-                  Text('${vs.max}'),
+                  const Text('100'),
                 ],
               ),
             ],
           ),
           const SizedBox(height: 16),
 
-          // ── Increment / Decrement (5 by 5) ───────────────────────────
+          // ── Increment / Decrement ────────────────────────────────────
           _SectionCard(
-            title: 'Increment / Decrement (±5 step)',
+            title: 'Increment / Decrement (platform step)',
             children: [
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
@@ -286,12 +277,12 @@ class _ChannelPageState extends State<ChannelPage> {
                   FilledButton.tonalIcon(
                     onPressed: _decrement,
                     icon: const Icon(Icons.remove),
-                    label: const Text('−5'),
+                    label: const Text('Down'),
                   ),
                   FilledButton.tonalIcon(
                     onPressed: _increment,
                     icon: const Icon(Icons.add),
-                    label: const Text('+5'),
+                    label: const Text('Up'),
                   ),
                 ],
               ),
@@ -306,17 +297,9 @@ class _ChannelPageState extends State<ChannelPage> {
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: vs.value > vs.min ? _mute : null,
-                  icon: Icon(
-                    vs.isMuted || vs.value <= vs.min
-                        ? Icons.volume_off
-                        : Icons.volume_mute,
-                  ),
-                  label: Text(
-                    vs.isMuted || vs.value <= vs.min
-                        ? 'Already muted'
-                        : 'Mute (set to ${vs.min})',
-                  ),
+                  onPressed: vol > 0 ? _mute : null,
+                  icon: Icon(vol == 0 ? Icons.volume_off : Icons.volume_mute),
+                  label: Text(vol == 0 ? 'Already muted' : 'Mute (set to 0)'),
                 ),
               ),
             ],

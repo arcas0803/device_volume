@@ -3,7 +3,7 @@
 [![pub.dev](https://img.shields.io/pub/v/device_volume.svg)](https://pub.dev/packages/device_volume)
 [![CI](https://github.com/arcas0803/device_volume/actions/workflows/ci.yml/badge.svg)](https://github.com/arcas0803/device_volume/actions)
 
-Control the device volume from Flutter. Provides read, write, increment, decrement and a live stream — with both synchronous and `compute`-based async variants.
+Control the device volume from Flutter. All volume values are normalized to an **integer 0–100** scale regardless of the platform's native range. Provides read, write, increment, decrement and a live stream — with both synchronous and `compute`-based async variants.
 
 ## Platform support
 
@@ -19,7 +19,7 @@ Control the device volume from Flutter. Provides read, write, increment, decreme
 
 ```yaml
 dependencies:
-  device_volume: ^0.1.0
+  device_volume: ^0.1.1
 ```
 
 ## Quick start
@@ -27,23 +27,23 @@ dependencies:
 ```dart
 import 'package:device_volume/device_volume.dart';
 
-// Read current volume
-final state = DeviceVolume.getVolume();
-print('${state.value} / ${state.max}  (${(state.normalized * 100).round()}%)');
+// Read current volume (0–100)
+final volume = DeviceVolume.getVolume();
+print('$volume%');
 
-// Set volume
+// Set volume (0–100)
 DeviceVolume.setVolume(50);
 
-// Increment / decrement
+// Increment / decrement by one platform step
 DeviceVolume.incrementVolume(showSystemUi: true);
 DeviceVolume.decrementVolume(showSystemUi: true);
 
-// Mute (set to minimum)
-DeviceVolume.setVolume(state.min);
+// Mute
+DeviceVolume.setVolume(0);
 
 // Observe changes
-DeviceVolume.streamVolume().listen((s) {
-  print('Volume changed: ${s.value}');
+DeviceVolume.streamVolume().listen((v) {
+  print('Volume changed: $v%');
 });
 ```
 
@@ -53,50 +53,39 @@ DeviceVolume.streamVolume().listen((s) {
 
 All methods are static. Every synchronous method has an async `*Compute` counterpart that runs on a background isolate via `flutter/foundation.dart compute()`.
 
+All volume values are normalized to an **integer 0–100** scale.
+
 #### Synchronous
 
 ```dart
-// Returns the current volume state.
-VolumeState getVolume({ VolumeChannel channel = VolumeChannel.media })
+// Returns the current volume (0–100).
+int getVolume({ VolumeChannel channel = VolumeChannel.media })
 
-// Sets volume to [value] (absolute, in platform units: min–max).
-VolumeState setVolume(int value, { VolumeChannel channel, bool showSystemUi })
+// Sets volume to [value] (0–100). Throws InvalidVolumeValueException if out of range.
+int setVolume(int value, { VolumeChannel channel, bool showSystemUi })
 
-// Increases by one platform step (5 units on most platforms).
-VolumeState incrementVolume({ VolumeChannel channel, bool showSystemUi })
+// Increases by one platform step. Returns resulting volume (0–100).
+int incrementVolume({ VolumeChannel channel, bool showSystemUi })
 
-// Decreases by one platform step.
-VolumeState decrementVolume({ VolumeChannel channel, bool showSystemUi })
+// Decreases by one platform step. Returns resulting volume (0–100).
+int decrementVolume({ VolumeChannel channel, bool showSystemUi })
 ```
 
 #### Async (background isolate)
 
 ```dart
-Future<VolumeState> getVolumeCompute({ VolumeChannel channel })
-Future<VolumeState> setVolumeCompute(int value, { VolumeChannel channel, bool showSystemUi })
-Future<VolumeState> incrementVolumeCompute({ VolumeChannel channel, bool showSystemUi })
-Future<VolumeState> decrementVolumeCompute({ VolumeChannel channel, bool showSystemUi })
+Future<int> getVolumeCompute({ VolumeChannel channel })
+Future<int> setVolumeCompute(int value, { VolumeChannel channel, bool showSystemUi })
+Future<int> incrementVolumeCompute({ VolumeChannel channel, bool showSystemUi })
+Future<int> decrementVolumeCompute({ VolumeChannel channel, bool showSystemUi })
 ```
 
 #### Stream
 
 ```dart
-// Emits the current state immediately, then on every change.
-Stream<VolumeState> streamVolume({ VolumeChannel channel })
+// Emits the current volume (0–100) immediately, then on every change.
+Stream<int> streamVolume({ VolumeChannel channel })
 ```
-
-### `VolumeState`
-
-Immutable snapshot returned by all API methods.
-
-| Property     | Type            | Description |
-|--------------|-----------------|-------------|
-| `value`      | `int`           | Current absolute volume level |
-| `min`        | `int`           | Minimum level reported by the platform |
-| `max`        | `int`           | Maximum level reported by the platform |
-| `normalized` | `double`        | `value` mapped to `[0.0, 1.0]` |
-| `isMuted`    | `bool`          | Whether the stream is muted |
-| `channel`    | `VolumeChannel` | The channel this state refers to |
 
 ### `VolumeChannel`
 
@@ -123,7 +112,7 @@ try {
 } on UnsupportedOperationException catch (e) {
   // Operation not available on this platform
 } on InvalidVolumeValueException catch (e) {
-  // Value out of range (below min or above max)
+  // Value out of range (must be 0–100)
 } on PermissionDeniedException catch (e) {
   // OS denied the request
 } on BackendNotAvailableException catch (e) {
@@ -141,7 +130,7 @@ try {
 | Exception                      | Code                      | When |
 |-------------------------------|---------------------------|------|
 | `UnsupportedOperationException` | `unsupported_operation`   | Operation not available on this platform |
-| `InvalidVolumeValueException`   | `invalid_volume_value`    | Value outside min–max range |
+| `InvalidVolumeValueException`   | `invalid_volume_value`    | Value outside 0–100 range |
 | `PermissionDeniedException`     | `permission_denied`       | OS denied the request |
 | `BackendNotAvailableException`  | `backend_not_available`   | No audio backend present |
 | `NativeBackendException`        | `native_backend_failure`  | Unexpected native error |
@@ -166,15 +155,4 @@ Requires PulseAudio or a PipeWire PulseAudio compatibility layer (`pipewire-puls
 ### Windows
 
 Uses WASAPI (`IAudioEndpointVolume`). Controls the default output device. COM is initialized automatically per call.
-For example, see `sum` in `lib/device_volume.dart`.
-
-Longer-running functions should be invoked on a helper isolate to avoid
-dropping frames in Flutter applications.
-For example, see `sumAsync` in `lib/device_volume.dart`.
-
-## Flutter help
-
-For help getting started with Flutter, view our
-[online documentation](https://docs.flutter.dev), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
 

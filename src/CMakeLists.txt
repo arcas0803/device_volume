@@ -20,7 +20,7 @@ if (ANDROID)
   # Support Android 15 16k page size
   target_link_options(device_volume PRIVATE "-Wl,-z,max-page-size=16384")
 elseif(WIN32)
-  target_link_libraries(device_volume PRIVATE ole32 uuid)
+  target_link_libraries(device_volume PRIVATE ole32)
 elseif(UNIX AND NOT APPLE)
   find_package(PkgConfig REQUIRED)
   pkg_check_modules(PULSE REQUIRED libpulse)

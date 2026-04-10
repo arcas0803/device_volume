@@ -1,0 +1,17 @@
+output:
+  c:
+    path: src/jni/
+    subdir: jni
+  dart:
+    path: lib/src/jni/device_volume_helper.dart
+    structure: single_file
+
+source_path:
+  - android/src/main/java
+
+android_sdk_config:
+  add_gradle_deps: true
+  android_example: example/
+
+classes:
+  - com.example.device_volume.DeviceVolumeHelper

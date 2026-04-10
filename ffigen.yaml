@@ -1,0 +1,15 @@
+# Run with `dart run ffigen --config ffigen.yaml`.
+name: DeviceVolumeBindings
+description: |
+  Bindings for `src/device_volume.h`.
+
+  Regenerate bindings with `dart run ffigen --config ffigen.yaml`.
+output: 'lib/device_volume_bindings_generated.dart'
+headers:
+  entry-points:
+    - 'src/device_volume.h'
+  include-directives:
+    - 'src/device_volume.h'
+comments:
+  style: any
+  length: full
